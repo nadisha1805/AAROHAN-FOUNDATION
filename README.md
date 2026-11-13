@@ -217,7 +217,7 @@ Completed features:
 - Donation receipts and templates are structured to avoid unsupported tax claims unless verified formally.
 - Placeholder contact details and policy language should be replaced with organization-approved values before production launch.
 - The repository-root `vercel.json` routes `/api/*` to the backend service and all other paths to the frontend service.
-- The backend TypeScript compiler is pinned to 5.9.3 because Vercel's Express builder currently fails its type-check step with TypeScript 7; retain the exact version and lockfile together.
+- Both service TypeScript compilers are pinned to 5.9.3 because Vercel's backend builder currently fails its type-check step with TypeScript 7; retain each exact version and lockfile together.
 
 ## Testing report summary
 
