@@ -65,6 +65,12 @@ npm run dev
 - `POST /api/volunteers`
 - `POST /api/contact`
 - `POST /api/newsletter/subscribe`
+- `POST /api/admin/login`
+- `GET /api/admin/overview`
+- `GET /api/admin/causes`
+- `GET /api/admin/campaigns`
+- `GET /api/admin/volunteers`
+- `GET /api/admin/enquiries`
 
 ## Completed feature list
 
@@ -100,3 +106,4 @@ Validated in this session:
 - This milestone intentionally does not implement the complete donation payment flow or admin dashboard.
 - Sensitive foundation details remain placeholder values to avoid inventing unverifiable information.
 - Sample campaign, cause, story, event, and impact data are clearly marked as demonstration data for Milestone 1 development.
+- Configure unique `ADMIN_EMAIL` and `ADMIN_PASSWORD` values in `backend/.env` to provision the initial super-admin account. Admin login is disabled when either value is missing.

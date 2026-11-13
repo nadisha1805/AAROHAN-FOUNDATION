@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { apiGet, apiPost } from './api';
+import { AdminDashboardPage, AdminLoginPage, AdminProtectedRoute } from './admin';
 
 const navItems = [
   { label: 'Home', to: '/' },
@@ -84,6 +85,7 @@ function Header() {
         </nav>
 
         <div className="nav-actions">
+          <Link to="/admin" className="btn btn-secondary small">Admin</Link>
           <Link to="/donate" className="btn btn-primary">Donate Now</Link>
           <button type="button" className="mobile-toggle" onClick={() => setOpen(!open)} aria-label="Toggle menu">
             {open ? <X size={22} /> : <Menu size={22} />}
@@ -953,6 +955,9 @@ function AppRoutes() {
           <Route path="/terms" element={<PolicyPage title="Terms and Conditions" subtitle="Placeholder content requiring legal review before publication." />} />
           <Route path="/donation-policy" element={<PolicyPage title="Donation Policy" subtitle="Placeholder content requiring approval before publication." />} />
           <Route path="/donate" element={<DonationComingSoonPage />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route path="/admin/*" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
+          <Route path="/admin" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="*" element={<PageHeader title="Page Not Found" subtitle="The page you requested could not be located." eyebrow="404" />} />
         </Routes>
       </main>

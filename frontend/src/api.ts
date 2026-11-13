@@ -5,9 +5,26 @@ export type ApiPath =
   | '/impact'
   | '/stories'
   | '/events'
-  | '/faqs';
+  | '/faqs'
+  | '/admin/login'
+  | '/admin/overview';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const ADMIN_TOKEN_KEY = 'aarohan_admin_token';
+
+export function getAuthToken() {
+  if (typeof window === 'undefined') return '';
+  return window.localStorage.getItem(ADMIN_TOKEN_KEY) ?? '';
+}
+
+export function setAuthToken(token: string | null) {
+  if (typeof window === 'undefined') return;
+  if (token) {
+    window.localStorage.setItem(ADMIN_TOKEN_KEY, token);
+    return;
+  }
+  window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+}
 
 const demoCauses = [
   { id: 'cause-edu', name: 'Education for All', slug: 'education-for-all', description: 'Supporting school access, digital learning, and mentorship for children and youth in underserved communities.', image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1200&q=80', status: 'active' },
@@ -60,10 +77,21 @@ const fallbackMap: Record<string, unknown> = {
   '/faqs': demoFaqs,
 };
 
-export async function apiGet(path: string) {
+export async function apiGet(path: string, auth = false) {
   try {
-    const response = await fetch(`${API_BASE}${path}`);
+    const headers: Record<string, string> = {};
+    if (auth) {
+      const token = getAuthToken();
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+    }
+
+    const response = await fetch(`${API_BASE}${path}`, { headers });
     if (!response.ok) {
+      if (auth && response.status === 401) {
+        throw new Error('Your session has expired. Please sign in again.');
+      }
       return fallbackMap[path] ?? [];
     }
     const data = await response.json();
@@ -73,14 +101,25 @@ export async function apiGet(path: string) {
   }
 }
 
-export async function apiPost(path: string, payload: Record<string, unknown>) {
+export async function apiPost(path: string, payload: Record<string, unknown>, auth = false) {
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (auth) {
+      const token = getAuthToken();
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+    }
+
     const response = await fetch(`${API_BASE}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
     });
     const data = await response.json();
+    if (!response.ok) {
+      return { success: false, message: data.message || 'Request failed.' };
+    }
     return data;
   } catch {
     return {
@@ -88,5 +127,30 @@ export async function apiPost(path: string, payload: Record<string, unknown>) {
       message: 'Demo submission accepted. Connect the backend to persist this form entry.',
       data: payload,
     };
+  }
+}
+
+export async function apiPatch(path: string, payload: Record<string, unknown>, auth = false) {
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (auth) {
+      const token = getAuthToken();
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+    }
+
+    const response = await fetch(`${API_BASE}${path}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      return { success: false, message: data.message || 'Request failed.' };
+    }
+    return data;
+  } catch {
+    return { success: false, message: 'Unable to update item.' };
   }
 }
