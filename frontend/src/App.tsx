@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from 'react-router-dom';
+import { BrowserRouter, Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowRight,
   CalendarDays,
@@ -917,14 +917,249 @@ function PolicyPage({ title, subtitle }: { title: string; subtitle: string }) {
   );
 }
 
-function DonationComingSoonPage() {
+function DonationPage() {
+  const navigate = useNavigate();
+  const [causes, setCauses] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [amountChoice, setAmountChoice] = useState('1000');
+  const [customAmount, setCustomAmount] = useState('');
+  const [form, setForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    donationType: 'general',
+    causeId: '',
+    campaignId: '',
+    donorMessage: '',
+    isAnonymous: false,
+    consent: false,
+  });
+  const [status, setStatus] = useState<{ success?: boolean; message?: string }>({});
+
+  useEffect(() => {
+    async function load() {
+      const [causeData, campaignData] = await Promise.all([
+        apiGet('/causes'),
+        apiGet('/campaigns'),
+      ]);
+      setCauses(Array.isArray(causeData) ? causeData : []);
+      setCampaigns(Array.isArray(campaignData) ? campaignData : []);
+      setLoading(false);
+    }
+    void load();
+  }, []);
+
+  const amountOptions = [500, 1000, 2500, 5000];
+
+  async function submitDonation(event: React.FormEvent) {
+    event.preventDefault();
+    const numericAmount = Number(customAmount || amountChoice || 0);
+
+    if (!form.fullName || !form.email || !form.phone || !form.consent) {
+      setStatus({ success: false, message: 'Please complete the donor details and consent before continuing.' });
+      return;
+    }
+
+    if (numericAmount <= 0 || Number.isNaN(numericAmount)) {
+      setStatus({ success: false, message: 'Please enter a valid donation amount greater than zero.' });
+      return;
+    }
+
+    if (form.donationType === 'cause' && !form.causeId) {
+      setStatus({ success: false, message: 'Please select a cause to support.' });
+      return;
+    }
+
+    if (form.donationType === 'campaign' && !form.campaignId) {
+      setStatus({ success: false, message: 'Please select a campaign to support.' });
+      return;
+    }
+
+    try {
+      const donationResponse = await apiPost('/donations', {
+        donorName: form.fullName,
+        donorEmail: form.email,
+        donorPhone: form.phone,
+        donationType: form.donationType,
+        causeId: form.causeId || '',
+        campaignId: form.campaignId || '',
+        amount: numericAmount,
+        donorMessage: form.donorMessage,
+        isAnonymous: form.isAnonymous,
+        consent: form.consent,
+        currency: 'INR',
+      });
+
+      if (!donationResponse.success) {
+        throw new Error(donationResponse.message || 'Unable to create donation.' );
+      }
+
+      const donationId = donationResponse.data?.id;
+      if (!donationId) {
+        throw new Error('Donation record missing from response.');
+      }
+
+      const paymentResponse = await apiPost('/payments/create-order', {
+        donationId,
+        amount: numericAmount,
+        currency: 'INR',
+      });
+
+      if (!paymentResponse.success) {
+        throw new Error(paymentResponse.message || 'Unable to create a payment order.');
+      }
+
+      const verifyResponse = await apiPost('/payments/verify', {
+        donationId,
+        orderId: paymentResponse.data?.orderId,
+        paymentId: `demo_payment_${Date.now()}`,
+        signature: 'demo_signature',
+      });
+
+      if (!verifyResponse.success) {
+        throw new Error(verifyResponse.message || 'Donation verification failed.');
+      }
+
+      navigate(`/donate/success/${donationId}`);
+    } catch (error) {
+      setStatus({
+        success: false,
+        message: error instanceof Error ? error.message : 'Something went wrong while processing your donation.',
+      });
+    }
+  }
+
   return (
     <>
-      <PageHeader title="Donation Information" subtitle="Online payment processing will be added in a future milestone. For now, this page serves as a clear donation placeholder." eyebrow="Coming soon" />
+      <PageHeader title="Support AAROHAN" subtitle="Your generosity can help fund essential care, education, and community support for families who need it most." eyebrow="Make a donation" />
+      <section className="section">
+        <div className="container donation-layout">
+          <div className="donation-summary-card">
+            <h3>How your donation helps</h3>
+            <ul className="bullets-list">
+              <li>Fund crisis response, education support, and nutrition programs.</li>
+              <li>Empower communities through sustainable, locally-led support.</li>
+              <li>Help create safer, healthier futures for children and families.</li>
+            </ul>
+            <div className="info-box">
+              <strong>Suggested giving</strong>
+              <div className="amount-chip-row">
+                {amountOptions.map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    className={amountChoice === String(amount) ? 'chip active' : 'chip'}
+                    onClick={() => {
+                      setAmountChoice(String(amount));
+                      setCustomAmount('');
+                    }}
+                  >
+                    ₹{amount.toLocaleString('en-IN')}
+                  </button>
+                ))}
+              </div>
+              <label className="field-label">Custom amount</label>
+              <input
+                type="number"
+                min={100}
+                step={50}
+                value={customAmount}
+                onChange={(event) => {
+                  setCustomAmount(event.target.value);
+                  if (event.target.value) {
+                    setAmountChoice('');
+                  }
+                }}
+                placeholder="Enter amount in INR"
+              />
+            </div>
+          </div>
+
+          <form onSubmit={submitDonation} className="form-shell donation-form">
+            <div className="form-grid two-col">
+              <input value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} placeholder="Full name" aria-label="Full name" />
+              <input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} type="email" placeholder="Email address" aria-label="Email address" />
+              <input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="Mobile number" aria-label="Mobile number" />
+              <select value={form.donationType} onChange={(event) => setForm({ ...form, donationType: event.target.value })} aria-label="Donation type">
+                <option value="general">General donation</option>
+                <option value="cause">Cause donation</option>
+                <option value="campaign">Campaign donation</option>
+              </select>
+            </div>
+
+            {form.donationType === 'cause' ? (
+              <select value={form.causeId} onChange={(event) => setForm({ ...form, causeId: event.target.value })} aria-label="Select a cause">
+                <option value="">Select a cause</option>
+                {causes.map((cause) => (
+                  <option key={cause.id} value={cause.id}>{cause.name}</option>
+                ))}
+              </select>
+            ) : null}
+
+            {form.donationType === 'campaign' ? (
+              <select value={form.campaignId} onChange={(event) => setForm({ ...form, campaignId: event.target.value })} aria-label="Select a campaign">
+                <option value="">Select a campaign</option>
+                {campaigns.map((campaign) => (
+                  <option key={campaign.id} value={campaign.id}>{campaign.title}</option>
+                ))}
+              </select>
+            ) : null}
+
+            <textarea value={form.donorMessage} onChange={(event) => setForm({ ...form, donorMessage: event.target.value })} rows={4} placeholder="Optional message for the foundation" aria-label="Optional message" />
+
+            <label className="checkbox-row">
+              <input type="checkbox" checked={form.isAnonymous} onChange={(event) => setForm({ ...form, isAnonymous: event.target.checked })} />
+              Donate anonymously.
+            </label>
+
+            <label className="checkbox-row">
+              <input type="checkbox" checked={form.consent} onChange={(event) => setForm({ ...form, consent: event.target.checked })} />
+              I agree to the donation terms and privacy policy.
+            </label>
+
+            <button type="submit" className="btn btn-primary" disabled={loading}>
+              {loading ? 'Preparing donation…' : 'Continue to secure payment'}
+            </button>
+            {status.message ? <p className={status.success ? 'success-text' : 'error-text'}>{status.message}</p> : null}
+          </form>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function DonationResultPage() {
+  const { id, state } = useParams();
+  const [donation, setDonation] = useState<any>(null);
+
+  useEffect(() => {
+    async function load() {
+      if (!id) return;
+      const result = await apiGet(`/donations/${id}/status`);
+      setDonation(result as any);
+    }
+    void load();
+  }, [id]);
+
+  const statusLabel = state === 'success' ? 'Payment verified' : state === 'pending' ? 'Payment pending' : 'Payment not completed';
+  const title = state === 'success' ? 'Thank you for your generosity' : state === 'pending' ? 'Your payment is being verified' : 'Donation was not completed';
+
+  return (
+    <>
+      <PageHeader title={title} subtitle="Your support helps AAROHAN Foundation continue its work with compassion and integrity." eyebrow={statusLabel} />
       <section className="section">
         <div className="container policy-box">
-          <p>Thank you for your interest in supporting AAROHAN Foundation. Donation processing will be implemented in Milestone 3.</p>
-          <p>For now, this is a clearly marked donation-information page to keep the user journey aligned with the project scope.</p>
+          {donation ? (
+            <>
+              <p><strong>Donation reference:</strong> {donation.paymentReference || donation.id}</p>
+              <p><strong>Amount:</strong> ₹{Number(donation.amount || 0).toLocaleString('en-IN')}</p>
+              <p><strong>Status:</strong> {donation.paymentStatus}</p>
+              {state === 'success' ? <Link to="/campaigns" className="btn btn-primary">Explore campaigns</Link> : <Link to="/donate" className="btn btn-primary">Try again</Link>}
+            </>
+          ) : (
+            <p>Loading donation details…</p>
+          )}
         </div>
       </section>
     </>
@@ -954,7 +1189,8 @@ function AppRoutes() {
           <Route path="/privacy-policy" element={<PolicyPage title="Privacy Policy" subtitle="Placeholder content requiring legal review before publication." />} />
           <Route path="/terms" element={<PolicyPage title="Terms and Conditions" subtitle="Placeholder content requiring legal review before publication." />} />
           <Route path="/donation-policy" element={<PolicyPage title="Donation Policy" subtitle="Placeholder content requiring approval before publication." />} />
-          <Route path="/donate" element={<DonationComingSoonPage />} />
+          <Route path="/donate" element={<DonationPage />} />
+          <Route path="/donate/:state/:id" element={<DonationResultPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin/*" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />
           <Route path="/admin" element={<AdminProtectedRoute><AdminDashboardPage /></AdminProtectedRoute>} />

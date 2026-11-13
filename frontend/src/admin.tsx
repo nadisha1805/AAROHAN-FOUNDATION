@@ -19,6 +19,7 @@ const adminNavigation = [
   'enquiries',
   'stories',
   'events',
+  'donations',
   'newsletter',
 ] as const;
 
@@ -183,6 +184,9 @@ function OverviewCards({ data }: { data: AdminOverview | null }) {
       { label: 'Published Stories', value: values.publishedStories ?? 0 },
       { label: 'Upcoming Events', value: values.upcomingEvents ?? 0 },
       { label: 'Newsletter Subscribers', value: values.newsletterSubscribers ?? 0 },
+      { label: 'Successful Donations', value: values.successfulDonations ?? 0 },
+      { label: 'Pending Donations', value: values.pendingDonations ?? 0 },
+      { label: 'Failed Donations', value: values.failedDonations ?? 0 },
     ];
   }, [data]);
 
@@ -208,6 +212,7 @@ function AdminDashboardPage() {
   const [enquiries, setEnquiries] = useState<any[]>([]);
   const [stories, setStories] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [donations, setDonations] = useState<any[]>([]);
   const [newsletter, setNewsletter] = useState<any[]>([]);
   const [error, setError] = useState('');
 
@@ -222,7 +227,7 @@ function AdminDashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [overviewData, causesData, campaignsData, volunteersData, enquiriesData, storiesData, eventsData, newsletterData] = await Promise.all([
+        const [overviewData, causesData, campaignsData, volunteersData, enquiriesData, storiesData, eventsData, donationsData, newsletterData] = await Promise.all([
           apiGet('/admin/overview', true),
           apiGet('/admin/causes', true),
           apiGet('/admin/campaigns', true),
@@ -230,6 +235,7 @@ function AdminDashboardPage() {
           apiGet('/admin/enquiries', true),
           apiGet('/admin/stories', true),
           apiGet('/admin/events', true),
+          apiGet('/admin/donations', true),
           apiGet('/admin/newsletter', true),
         ]);
         setOverview(overviewData as AdminOverview);
@@ -239,6 +245,7 @@ function AdminDashboardPage() {
         setEnquiries(Array.isArray(enquiriesData) ? enquiriesData : []);
         setStories(Array.isArray(storiesData) ? storiesData : []);
         setEvents(Array.isArray(eventsData) ? eventsData : []);
+        setDonations(Array.isArray(donationsData) ? donationsData : []);
         setNewsletter(Array.isArray(newsletterData) ? newsletterData : []);
         setError('');
       } catch (err) {
@@ -312,6 +319,8 @@ function AdminDashboardPage() {
         return <AdminContentTable title="Stories & News" items={stories} onRefresh={setStories} />;
       case 'events':
         return <AdminContentTable title="Events" items={events} onRefresh={setEvents} />;
+      case 'donations':
+        return <AdminDonationsTable items={donations} />;
       case 'newsletter':
         return <AdminNewsletterTable items={newsletter} />;
       default:
@@ -536,6 +545,32 @@ function AdminContentTable({ title, items, onRefresh }: { title: string; items: 
             </tr>
           )) : (
             <tr><td colSpan={4}><div className="empty-state">No {title.toLowerCase()} available.</div></td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AdminDonationsTable({ items }: { items: any[] }) {
+  return (
+    <div className="admin-card">
+      <h3>Donations</h3>
+      <table className="admin-table">
+        <thead>
+          <tr><th>Donor</th><th>Amount</th><th>Type</th><th>Status</th><th>Reference</th></tr>
+        </thead>
+        <tbody>
+          {items.length ? items.map((item) => (
+            <tr key={item.id}>
+              <td>{item.isAnonymous ? 'Anonymous donor' : item.donorName}</td>
+              <td>₹{Number(item.amount || 0).toLocaleString('en-IN')}</td>
+              <td>{item.donationType}</td>
+              <td>{item.paymentStatus}</td>
+              <td>{item.paymentReference || item.gatewayPaymentId || '—'}</td>
+            </tr>
+          )) : (
+            <tr><td colSpan={5}><div className="empty-state">No donation records yet.</div></td></tr>
           )}
         </tbody>
       </table>
